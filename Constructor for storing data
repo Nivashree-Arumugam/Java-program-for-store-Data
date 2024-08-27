@@ -1,0 +1,65 @@
+import java.util.Scanner;
+class mobile
+{
+    String name;
+    int ram;
+    int storage;
+    String processor;
+    int price;
+    mobile[] m;
+
+public mobile()
+{
+    super();
+}
+public mobile(String name,int ram,int storage,String processor,int price)
+{
+    super();
+    this.name=name;
+    this.ram=ram;
+    this.storage=storage;
+    this.processor=processor;
+    this.price=price;
+}
+
+int get_mobile(int num)
+{
+    m=new mobile[num];
+    Scanner get=new Scanner(System.in);
+    for(int i=0;i<num;i++)
+    {
+        System.out.println("Enter the mobile Name"+" "+(i+1));
+        String name=get.next();
+        System.out.println("Enter the RAM"+" "+(i+1));
+        int ram=get.nextInt();
+        System.out.println("Enter the Storage of mobile"+" "+(i+1));
+        int storage=get.nextInt();
+        System.out.println("Enter the Processor Name"+" "+(i+1));
+        String processor=get.next();
+        System.out.println("Enter the mobile Price"+" "+(i+1));
+        int price=get.nextInt();
+        m[i]=new mobile(name,ram,storage,processor,price);
+    }
+    return 1;
+}
+void print_mobile(int num)
+{
+    for(int i=0;i<num;i++)
+    {
+        System.out.println("Name:"+m[i].name);
+        System.out.println("Ram:"+m[i].ram);
+        System.out.println("Storage:"+m[i].storage);
+        System.out.println("Processor:"+m[i].processor);
+        System.out.println("Price:"+m[i].price);
+    }
+}
+public static void main(String args[])
+{
+    System.out.println("Enter number of mobiles:");
+    Scanner get=new Scanner(System.in);
+    int num=get.nextInt();
+    mobile mob=new mobile();
+    int m1=mob.get_mobile(num);
+    mob.print_mobile(num);
+}
+}
