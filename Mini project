@@ -1,0 +1,210 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class BankApp {
+    private static final String JDBC_URL = "jdbc:mysql://localhost:3306/banking";
+    private static final String JDBC_USER = "root";
+    private static final String JDBC_PASSWORD = "password";
+
+    private Connection connection;
+
+    public BankApp() {
+        try {
+            // Establishing connection to the database
+            connection = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PASSWORD);
+            System.out.println("Connected to the database.");
+        } catch (SQLException e) {
+            System.out.println("Failed to connect to the database.");
+            e.printStackTrace();
+        }
+    }
+
+    public void checkBalance(int accountId) {
+        String query = "SELECT balance FROM accounts WHERE account_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setInt(1, accountId);
+            ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next()) {
+                System.out.println("Balance: $" + resultSet.getDouble("balance"));
+            } else {
+                System.out.println("Account not found.");
+            }
+        } catch (SQLException e) {
+            System.out.println("Error retrieving balance.");
+            e.printStackTrace();
+        }
+    }
+
+    public void transferFunds(int fromAccountId, int toAccountId, double amount) {
+        try {
+            connection.setAutoCommit(false);
+
+            if (!hasSufficientBalance(fromAccountId, amount)) {
+                System.out.println("Insufficient balance.");
+                return;
+            }
+
+            updateBalance(fromAccountId, -amount);
+            updateBalance(toAccountId, amount);
+            logTransaction(fromAccountId, "Debit", amount);
+            logTransaction(toAccountId, "Credit", amount);
+
+            connection.commit();
+            System.out.println("Transfer successful.");
+        } catch (SQLException e) {
+            try {
+                connection.rollback();
+                System.out.println("Transfer failed. Rolled back transaction.");
+            } catch (SQLException ex) {
+                System.out.println("Error during rollback.");
+                ex.printStackTrace();
+            }
+            e.printStackTrace();
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void viewTransactionHistory(int accountId) {
+        String query = "SELECT * FROM transactions WHERE account_id = ? ORDER BY timestamp DESC";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setInt(1, accountId);
+            ResultSet resultSet = statement.executeQuery();
+            System.out.println("Transaction History:");
+            while (resultSet.next()) {
+                System.out.println("Transaction ID: " + resultSet.getInt("transaction_id"));
+                System.out.println("Type: " + resultSet.getString("type"));
+                System.out.println("Amount: $" + resultSet.getDouble("amount"));
+                System.out.println("Timestamp: " + resultSet.getTimestamp("timestamp"));
+                System.out.println();
+            }
+        } catch (SQLException e) {
+            System.out.println("Error retrieving transaction history.");
+            e.printStackTrace();
+        }
+    }
+
+    private boolean hasSufficientBalance(int accountId, double amount) throws SQLException {
+        String query = "SELECT balance FROM accounts WHERE account_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setInt(1, accountId);
+            ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next()) {
+                return resultSet.getDouble("balance") >= amount;
+            } else {
+                throw new SQLException("Account not found.");
+            }
+        }
+    }
+
+    private void updateBalance(int accountId, double amount) throws SQLException {
+        String query = "UPDATE accounts SET balance = balance + ? WHERE account_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setDouble(1, amount);
+            statement.setInt(2, accountId);
+            statement.executeUpdate();
+        }
+    }
+
+    private void logTransaction(int accountId, String type, double amount) throws SQLException {
+        String query = "INSERT INTO transactions (account_id, type, amount) VALUES (?, ?, ?)";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setInt(1, accountId);
+            statement.setString(2, type);
+            statement.setDouble(3, amount);
+            statement.executeUpdate();
+        }
+    }
+
+    public static void main(String[] args) {
+        BankApp bankApp = new BankApp();
+        Scanner scanner = new Scanner(System.in);
+
+        boolean exit = false;
+        while (!exit) {
+            System.out.println("\n1. Check Balance");
+            System.out.println("2. Transfer Funds");
+            System.out.println("3. View Transaction History");
+            System.out.println("4. Exit");
+            System.out.print("Choose an option: ");
+            
+            // Handle possible input errors
+            int choice = 0;
+            try {
+                choice = scanner.nextInt();
+            } catch (Exception e) {
+                System.out.println("Invalid input. Please enter a valid option.");
+                scanner.nextLine(); // Consume the invalid input
+                continue;
+            }
+
+            switch (choice) {
+                case 1:
+                    System.out.print("Enter Account ID: ");
+                    int accountId = getValidAccountId(scanner);
+                    bankApp.checkBalance(accountId);
+                    break;
+                case 2:
+                    System.out.print("Enter Your Account ID: ");
+                    int fromAccountId = getValidAccountId(scanner);
+                    System.out.print("Enter Recipient Account ID: ");
+                    int toAccountId = getValidAccountId(scanner);
+                    System.out.print("Enter Amount: ");
+                    double amount = getValidAmount(scanner);
+                    bankApp.transferFunds(fromAccountId, toAccountId, amount);
+                    break;
+                case 3:
+                    System.out.print("Enter Account ID: ");
+                    int accId = getValidAccountId(scanner);
+                    bankApp.viewTransactionHistory(accId);
+                    break;
+                case 4:
+                    exit = true;
+                    System.out.println("Goodbye!");
+                    break;
+                default:
+                    System.out.println("Invalid option. Please try again.");
+            }
+        }
+
+        scanner.close();
+    }
+
+    // Helper method to get a valid account ID
+    private static int getValidAccountId(Scanner scanner) {
+        int accountId = -1;
+        while (accountId <= 0) {
+            try {
+                accountId = scanner.nextInt();
+                if (accountId <= 0) {
+                    System.out.println("Invalid Account ID. Please enter a positive number.");
+                }
+            } catch (Exception e) {
+                System.out.println("Invalid input. Please enter a valid account ID.");
+                scanner.nextLine(); // Consume the invalid input
+            }
+        }
+        return accountId;
+    }
+
+    // Helper method to get a valid amount (positive double)
+    private static double getValidAmount(Scanner scanner) {
+        double amount = -1;
+        while (amount <= 0) {
+            try {
+                amount = scanner.nextDouble();
+                if (amount <= 0) {
+                    System.out.println("Invalid amount. Please enter a positive value.");
+                }
+            } catch (Exception e) {
+                System.out.println("Invalid input. Please enter a valid amount.");
+                scanner.nextLine(); // Consume the invalid input
+            }
+        }
+        return amount;
+    }
+}
